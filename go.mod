@@ -1,5 +1,5 @@
 module github.com/go-darwin/availability
 
-go 1.16
+go 1.17
 
-require golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
+require golang.org/x/sys v0.0.0-20211013075003-97ac67df715c
