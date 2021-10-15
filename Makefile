@@ -7,11 +7,6 @@ GO_TEST ?= go test -v
 GO_TEST_FLAGS ?= -race -count=1
 GO_TEST_FUNC ?= .
 GO_TEST_PACKAGE ?= ./...
-GO_LINT_PACKAGE ?= ./...
-
-TOOLS_DIR := ${CURDIR}/tools
-TOOLS_BIN := ${TOOLS_DIR}/bin
-TOOLS := $(shell cd ${TOOLS_DIR} && go list -v -x -f '{{ join .Imports " " }}' -tags=tools)
 
 JOBS := $(shell getconf _NPROCESSORS_CONF)
 ifeq ($(CIRCLECI),true)
@@ -22,41 +17,18 @@ ifeq (${GO_OS},linux)
 endif
 endif
 
-define target
-@printf "+ $(patsubst ,$@,$(1))\\n" >&2
-endef
-
 ##@ gen
 
 define gen
 @rm -f $2
-@cat hack/boilerplate/boilerplate.go.txt > $2
-@go tool cgo -godefs $1 $3 | tee -a $2 > /dev/null 2>&1
-@gofmt -s -w $2
+printf '// Copyright 2021 The Go Darwin Authors\n// SPDX-License-Identifier: BSD-3-Clause\n\n//go:build darwin\n// +build darwin\n\n' > $2
+@go tool cgo -godefs $1 $3 | gofmt -s | tee -a $2 > /dev/null 2>&1
 @sed -i 's|${CURDIR}/||' $2
 @rm -rf _obj
 endef
 
-ztypes_darwin_amd64.go: types_darwin_amd64.go
-	$(call target)
+ztypes_darwin.go: types_darwin.go
 	$(call gen,$^,$@)
-
-
-##@ fmt, lint
-
-.PHONY: fmt
-fmt: tools/asmfmt  ## Run asmfmt.
-	$(call target)
-	find . -type f -name '*.s' -not -path './vendor/*' | xargs -P ${JOBS} ${TOOLS_BIN}/asmfmt -w
-
-.PHONY: lint
-lint: lint/asmvet  ## Run all linter.
-
-.PHONY: lint/asmvet
-lint/asmvet: tools/asmvet  ## Run asmvet.
-	$(call target)
-	go vet -vettool=${TOOLS_BIN}/asmvet ${GO_LINT_PACKAGE}
-
 
 ##@ test
 
@@ -65,7 +37,7 @@ ${GO_TEST} $(strip ${GO_FLAGS}) ${GO_TEST_FLAGS} -run=${GO_TEST_FUNC} ${GO_TEST_
 endef
 
 .PHONY: test
-test: tools/gotestsum  ## Run test.
+test:  ## Run test.
 	$(call go_test)
 
 .PHONY: coverage
@@ -73,31 +45,13 @@ coverage: GO_TEST_FLAGS+=-covermode=atomic -coverpkg=./... -coverprofile=coverag
 coverage: tools/gotestsum  ## Run test and collect coverages.
 	$(call go_test)
 
-
-##@ tools
-
-.PHONY: tools
-tools: tools/''  ## Install tools
-
-tools/%: ${TOOLS_DIR}/go.mod ${TOOLS_DIR}/go.sum
-	@cd tools; \
-	  for t in ${TOOLS}; do \
-			if [ -z '$*' ] || [ $$(basename $$t) = '$*' ]; then \
-				echo "Install $$t ..." >&2; \
-				GOBIN=${TOOLS_BIN} CGO_ENABLED=0 go install -mod=mod ${GO_FLAGS} "$${t}"; \
-			fi \
-	  done
-
-
 ##@ clean
 
 .PHONY: clean
 clean:  ## Cleanups binaries and extra files in the package.
 	$(call target)
-	@$(RM) -rf *.out *.test *.prof trace.txt **/_obj ${TOOLS_BIN}
+	@$(RM) -rf *.out *.test *.prof *.txt **/_obj ${TOOLS_BIN}
 
-
-# ----------------------------------------------------------------------------
 ##@ help
 
 .PHONY: help
