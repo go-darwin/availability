@@ -101,6 +101,24 @@ func TestDarwinVersion(t *testing.T) {
 	}
 }
 
+func TestVersion(t *testing.T) {
+	tests := map[string]struct {
+		want int32
+	}{
+		"host": {
+			want: swvers(),
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := Version()
+			if got != tt.want {
+				t.Fatalf("Version() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 var n int32
 
 func BenchmarkDarwinVersion(b *testing.B) {
@@ -109,5 +127,14 @@ func BenchmarkDarwinVersion(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		n += DarwinVersion()
+	}
+}
+
+func BenchmarkVersion(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		n += Version()
 	}
 }
